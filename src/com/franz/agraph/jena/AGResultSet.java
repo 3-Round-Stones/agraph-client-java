@@ -39,7 +39,11 @@ public class AGResultSet implements ResultSet {
 
 	@Override
 	public List<String> getResultVars() {
-		return result.getBindingNames();
+		try {
+			return result.getBindingNames();
+		} catch (QueryEvaluationException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	@Override

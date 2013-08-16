@@ -18,6 +18,8 @@ import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.URI;
+import org.openrdf.model.ValueFactory;
+import org.openrdf.model.impl.ValueFactoryImpl;
 import org.openrdf.model.util.GraphUtil;
 import org.openrdf.model.util.GraphUtilException;
 import org.openrdf.repository.config.RepositoryConfigException;
@@ -111,19 +113,19 @@ public class AGRepositoryConfig extends RepositoryImplConfigBase {
 		Resource implNode = super.export(graph);
 
 		if (serverUrl != null) {
-			graph.add(implNode, SERVERURL, graph.getValueFactory().createURI(serverUrl));
+			graph.add(implNode, SERVERURL, getValueFactory().createURI(serverUrl));
 		}
 		if (username != null) {
-			graph.add(implNode, USERNAME, graph.getValueFactory().createLiteral(username));
+			graph.add(implNode, USERNAME, getValueFactory().createLiteral(username));
 		}
 		if (password != null) {
-			graph.add(implNode, PASSWORD, graph.getValueFactory().createLiteral(password));
+			graph.add(implNode, PASSWORD, getValueFactory().createLiteral(password));
 		}
 		if (catalogId != null) {
-			graph.add(implNode, CATALOGID, graph.getValueFactory().createLiteral(catalogId));
+			graph.add(implNode, CATALOGID, getValueFactory().createLiteral(catalogId));
 		}
 		if (repositoryId != null) {
-			graph.add(implNode, REPOSITORYID, graph.getValueFactory().createLiteral(repositoryId));
+			graph.add(implNode, REPOSITORYID, getValueFactory().createLiteral(repositoryId));
 		}
 
 		return implNode;
@@ -160,5 +162,9 @@ public class AGRepositoryConfig extends RepositoryImplConfigBase {
 		catch (GraphUtilException e) {
 			throw new RepositoryConfigException(e.getMessage(), e);
 		}
+	}
+
+	private ValueFactory getValueFactory() {
+		return ValueFactoryImpl.getInstance();
 	}
 }

@@ -8,17 +8,29 @@
 
 package com.franz.agraph.repository;
 
+import info.aduna.io.GZipUtil;
+import info.aduna.io.ZipUtil;
 import info.aduna.iteration.CloseableIteratorIteration;
 import info.aduna.iteration.Iteration;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -38,15 +50,17 @@ import org.openrdf.query.BindingSet;
 import org.openrdf.query.QueryEvaluationException;
 import org.openrdf.query.QueryLanguage;
 import org.openrdf.query.TupleQueryResult;
-import org.openrdf.query.Update;
 import org.openrdf.repository.RepositoryConnection;
 import org.openrdf.repository.RepositoryException;
 import org.openrdf.repository.RepositoryResult;
+import org.openrdf.repository.UnknownTransactionStateException;
 import org.openrdf.repository.base.RepositoryConnectionBase;
 import org.openrdf.rio.RDFFormat;
 import org.openrdf.rio.RDFHandler;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
+import org.openrdf.rio.RDFParserRegistry;
+import org.openrdf.rio.Rio;
 import org.openrdf.rio.helpers.StatementCollector;
 import org.openrdf.rio.ntriples.NTriplesUtil;
 
@@ -291,9 +305,162 @@ implements RepositoryConnection, Closeable {
 	private String encodeValueForStorageJSON(Value v) {
 		return NTriplesUtil.toNTriplesString(repoclient.getStorableValue(v,vf));
 	}
-	
-	@Override
-	protected void addInputStreamOrReader(Object inputStreamOrReader,
+
+	public void add(File file, String baseURI, RDFFormat dataFormat, Resource... contexts)
+		throws IOException, RDFParseException, RepositoryException
+	{
+		if (baseURI == null) {
+			// default baseURI to file
+			baseURI = file.toURI().toString();
+		}
+		if (dataFormat == null) {
+			dataFormat = Rio.getParserFormatForFileName(file.getName());
+		}
+
+		InputStream in = new FileInputStream(file);
+		try {
+			add(in, baseURI, dataFormat, contexts);
+		}
+		finally {
+			in.close();
+		}
+	}
+
+	public void add(URL url, String baseURI, RDFFormat dataFormat, Resource... contexts)
+		throws IOException, RDFParseException, RepositoryException
+	{
+		if (baseURI == null) {
+			baseURI = url.toExternalForm();
+		}
+
+		URLConnection con = url.openConnection();
+
+		// Set appropriate Accept headers
+		if (dataFormat != null) {
+			for (String mimeType : dataFormat.getMIMETypes()) {
+				con.addRequestProperty("Accept", mimeType);
+			}
+		}
+		else {
+			Set<RDFFormat> rdfFormats = RDFParserRegistry.getInstance().getKeys();
+			List<String> acceptParams = RDFFormat.getAcceptParams(rdfFormats, true, null);
+			for (String acceptParam : acceptParams) {
+				con.addRequestProperty("Accept", acceptParam);
+			}
+		}
+
+		InputStream in = con.getInputStream();
+
+		if (dataFormat == null) {
+			// Try to determine the data's MIME type
+			String mimeType = con.getContentType();
+			int semiColonIdx = mimeType.indexOf(';');
+			if (semiColonIdx >= 0) {
+				mimeType = mimeType.substring(0, semiColonIdx);
+			}
+			dataFormat = Rio.getParserFormatForMIMEType(mimeType);
+
+			// Fall back to using file name extensions
+			if (dataFormat == null) {
+				dataFormat = Rio.getParserFormatForFileName(url.getPath());
+			}
+		}
+
+		try {
+			add(in, baseURI, dataFormat, contexts);
+		}
+		finally {
+			in.close();
+		}
+	}
+
+	public void add(InputStream in, String baseURI, RDFFormat dataFormat, Resource... contexts)
+		throws IOException, RDFParseException, RepositoryException
+	{
+		if (!in.markSupported()) {
+			in = new BufferedInputStream(in, 1024);
+		}
+
+		if (ZipUtil.isZipStream(in)) {
+			addZip(in, baseURI, dataFormat, contexts);
+		}
+		else if (GZipUtil.isGZipStream(in)) {
+			add(new GZIPInputStream(in), baseURI, dataFormat, contexts);
+		}
+		else {
+			addInputStreamOrReader(in, baseURI, dataFormat, contexts);
+		}
+	}
+
+	private void addZip(InputStream in, String baseURI, RDFFormat dataFormat, Resource... contexts)
+		throws IOException, RDFParseException, RepositoryException
+	{
+		boolean autoCommit = isAutoCommit();
+		setAutoCommit(false);
+
+		try {
+			ZipInputStream zipIn = new ZipInputStream(in);
+
+			try {
+				for (ZipEntry entry = zipIn.getNextEntry(); entry != null; entry = zipIn.getNextEntry()) {
+					if (entry.isDirectory()) {
+						continue;
+					}
+
+					RDFFormat format = Rio.getParserFormatForFileName(entry.getName(), dataFormat);
+
+					try {
+						// Prevent parser (Xerces) from closing the input stream
+						FilterInputStream wrapper = new FilterInputStream(zipIn) {
+
+							public void close() {
+							}
+						};
+						add(wrapper, baseURI, format, contexts);
+					}
+					catch (RDFParseException e) {
+						if (autoCommit) {
+							rollback();
+						}
+
+						String msg = e.getMessage() + " in " + entry.getName();
+						RDFParseException pe = new RDFParseException(msg, e.getLineNumber(), e.getColumnNumber());
+						pe.initCause(e);
+						throw pe;
+					}
+					finally {
+						zipIn.closeEntry();
+					}
+				}
+			}
+			finally {
+				zipIn.close();
+			}
+		}
+		catch (IOException e) {
+			if (autoCommit) {
+				rollback();
+			}
+			throw e;
+		}
+		catch (RepositoryException e) {
+			if (autoCommit) {
+				rollback();
+			}
+			throw e;
+		}
+		finally {
+			setAutoCommit(autoCommit);
+		}
+	}
+
+	public void add(Reader reader, String baseURI, RDFFormat dataFormat, Resource... contexts)
+		throws IOException, RDFParseException, RepositoryException
+	{
+		addInputStreamOrReader(reader, baseURI, dataFormat, contexts);
+	}
+
+	private void addInputStreamOrReader(Object inputStreamOrReader,
 			String baseURI, RDFFormat dataFormat, Resource... contexts)
 			throws IOException, RDFParseException, RepositoryException {
 
@@ -376,6 +543,17 @@ implements RepositoryConnection, Closeable {
 		return getHttpRepoClient().isAutoCommit();
 	}
 
+	@Override
+	public boolean isActive() throws UnknownTransactionStateException,
+			RepositoryException {
+		return !getHttpRepoClient().isAutoCommit();
+	}
+
+	@Override
+	public void begin() throws RepositoryException {
+		getHttpRepoClient().setAutoCommit(false);
+	}
+
 	/**
 	 * Commit the current transaction.
 	 * See <a href="#sessions">session overview</a> and
@@ -384,6 +562,7 @@ implements RepositoryConnection, Closeable {
 	 */
 	public void commit() throws RepositoryException {
 		getHttpRepoClient().commit();
+		getHttpRepoClient().setAutoCommit(true);
 	}
 
 	/**
@@ -394,6 +573,7 @@ implements RepositoryConnection, Closeable {
 	 */
 	public void rollback() throws RepositoryException {
 		getHttpRepoClient().rollback();
+		getHttpRepoClient().setAutoCommit(true);
 	}
 
 	/**
@@ -412,17 +592,6 @@ implements RepositoryConnection, Closeable {
 	 */
 	public boolean isStreamResults() {
 		return streamResults;
-	}
-	
-	/**
-	 * This method should do nothing, as the AllegroGraph server manages
-	 * autoCommit.
-	 */
-	@Override
-	protected void autoCommit() throws RepositoryException {
-		/*
-		 * if (isAutoCommit()) { commit(); }
-		 */
 	}
 
 	public void clearNamespaces() throws RepositoryException {

@@ -31,17 +31,21 @@
 
     <target name="dependencies" depends="init" description="Download all dependencies">
         <basename file="${servlet-api.url}" property="servlet-api.jar" />
+        <basename file="${openrdf-sesame.url}" property="openrdf-sesame.jar" />
         <basename file="${agraph-client-java.url}" property="agraph-client-java.zip" />
         <mkdir dir="${downloads}" />
         <get usetimestamp="true" skipexisting="${lib.present}" dest="${downloads}">
             <url url="${servlet-api.url}" />
+            <url url="${openrdf-sesame.url}" />
             <url url="${agraph-client-java.url}" />
         </get>
         <mkdir dir="${lib}" />
         <copy file="${downloads}/${servlet-api.jar}" tofile="${lib}/${servlet-api.jar}" />
+        <copy file="${downloads}/${openrdf-sesame.jar}" tofile="${lib}/${openrdf-sesame.jar}" />
         <untar compression="gzip" overwrite="false" src="${downloads}/${agraph-client-java.zip}" dest="${lib}">
             <patternset>
                 <include name="**/*.jar" />
+                <exclude name="**/openrdf-sesame*.jar" />
                 <exclude name="**/agraph*.jar" />
             </patternset>
             <mapper type="flatten" />
