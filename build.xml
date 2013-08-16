@@ -76,7 +76,7 @@
     </target>
 
     <target name="package" depends="clean,dist" description="Create a package ready for release">
-        <echo>Artifact ready: ${dist}/${dist}/agraph.jar</echo>
+        <echo>Artifact ready: ${dist}/agraph.jar</echo>
     </target>
 
 </project>
