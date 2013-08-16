@@ -38,6 +38,27 @@ public class AGRepositorySchema {
 	
 	/** <tt>http://franz.com/agraph/repository/config#repositoryId</tt> */
 	public final static URI REPOSITORYID;
+
+	/** <tt>http://franz.com/agraph/repository/config#session</tt> */
+	public final static URI SESSION_TYPE;
+
+	/** <tt>http://franz.com/agraph/repository/config#sessionLifetime</tt> */
+	public final static URI SESSION_LIFETIME;
+
+	/** <tt>http://franz.com/agraph/repository/config#shutdownHook</tt> */
+	public final static URI SHUTDOWN_HOOK;
+
+	/** <tt>http://franz.com/agraph/repository/config#testOnBorrow</tt> */
+	public final static URI TEST_ON_BORROW;
+
+	/** <tt>http://franz.com/agraph/repository/config#maxActive</tt> */
+	public final static URI POOL_MAX_ACTIVE_CONNECTIONS;
+
+	/** <tt>http://franz.com/agraph/repository/config#maxIdle</tt> */
+	public final static URI POOL_MAX_IDLE_CONNECTIONS;
+
+	/** <tt>http://franz.com/agraph/repository/config#maxWait</tt> */
+	public final static URI POOL_MAX_TIME_TO_WAIT_FOR_CONNECTION;
 	
 	static {
 		ValueFactory factory = ValueFactoryImpl.getInstance();
@@ -46,5 +67,12 @@ public class AGRepositorySchema {
 		PASSWORD = factory.createURI(NAMESPACE, "password");
 		CATALOGID = factory.createURI(NAMESPACE, "catalogId");
 		REPOSITORYID = factory.createURI(NAMESPACE, "repositoryId");
+        SESSION_TYPE = factory.createURI(NAMESPACE, "session");
+        SESSION_LIFETIME = factory.createURI(NAMESPACE, "sessionLifetime");
+        SHUTDOWN_HOOK = factory.createURI(NAMESPACE, "shutdownHook");
+        TEST_ON_BORROW = factory.createURI(NAMESPACE, "testOnBorrow");
+        POOL_MAX_ACTIVE_CONNECTIONS = factory.createURI(NAMESPACE, "maxActive");
+        POOL_MAX_IDLE_CONNECTIONS = factory.createURI(NAMESPACE, "maxIdle");
+        POOL_MAX_TIME_TO_WAIT_FOR_CONNECTION = factory.createURI(NAMESPACE, "maxWait");
 	}
 }

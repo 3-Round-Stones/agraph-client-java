@@ -14,6 +14,9 @@ import org.openrdf.repository.config.RepositoryConfigException;
 import org.openrdf.repository.config.RepositoryFactory;
 import org.openrdf.repository.config.RepositoryImplConfig;
 
+import com.franz.agraph.pool.AGConnPool;
+import com.franz.agraph.pool.AGConnProp;
+import com.franz.agraph.pool.AGPoolProp;
 import com.franz.agraph.repository.AGRepository;
 import com.franz.agraph.repository.AGServer;
 
@@ -53,6 +56,25 @@ public class AGRepositoryFactory implements RepositoryFactory {
 				result = server.createCatalog(agconfig.getCatalogId()).createRepository(agconfig.getRepositoryId());
 			} catch (RepositoryException e) {
 				throw new RepositoryConfigException(e);
+			}
+			if (agconfig.getMaxIdle() > 0) {
+				try {
+					result.setConnPool(AGConnPool.create(
+							AGConnProp.serverUrl, agconfig.getServerUrl(),
+							AGConnProp.username, agconfig.getUsername(),
+							AGConnProp.password, agconfig.getPassword(),
+							AGConnProp.catalog, agconfig.getCatalogId(),
+							AGConnProp.repository, agconfig.getRepositoryId(),
+							AGConnProp.session, agconfig.getSession(),
+							AGConnProp.sessionLifetime, agconfig.getSessionLifetime(),
+							AGPoolProp.shutdownHook, agconfig.isShutdownHook(),
+							AGPoolProp.testOnBorrow, agconfig.isTestOnBorrow(),
+							AGPoolProp.maxActive, agconfig.getMaxActive(),
+							AGPoolProp.maxIdle, agconfig.getMaxIdle(),
+							AGPoolProp.maxWait, agconfig.getMaxWait()));
+				} catch (RepositoryException e) {
+					throw new RepositoryConfigException(e);
+				}
 			}
 		}
 		else {

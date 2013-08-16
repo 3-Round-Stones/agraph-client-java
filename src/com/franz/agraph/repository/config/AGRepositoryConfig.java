@@ -8,11 +8,13 @@
 
 package com.franz.agraph.repository.config;
 
-import static com.franz.agraph.repository.config.AGRepositorySchema.CATALOGID;
+import static com.franz.agraph.repository.config.AGRepositorySchema.*;
 import static com.franz.agraph.repository.config.AGRepositorySchema.PASSWORD;
 import static com.franz.agraph.repository.config.AGRepositorySchema.REPOSITORYID;
 import static com.franz.agraph.repository.config.AGRepositorySchema.SERVERURL;
 import static com.franz.agraph.repository.config.AGRepositorySchema.USERNAME;
+
+import java.util.concurrent.TimeUnit;
 
 import org.openrdf.model.Graph;
 import org.openrdf.model.Literal;
@@ -25,6 +27,8 @@ import org.openrdf.model.util.GraphUtilException;
 import org.openrdf.repository.config.RepositoryConfigException;
 import org.openrdf.repository.config.RepositoryImplConfigBase;
 
+import com.franz.agraph.pool.AGConnProp.Session;
+
 /**
  * Configuration for an AllegroGraph Repository.
  * 
@@ -36,6 +40,13 @@ public class AGRepositoryConfig extends RepositoryImplConfigBase {
 	private String password;
 	private String catalogId;
 	private String repositoryId;
+    private Session session = com.franz.agraph.pool.AGConnProp.Session.DEDICATED;
+    private long sessionLifetime = TimeUnit.MINUTES.toSeconds(1);
+    private boolean shutdownHook = false;
+    private boolean testOnBorrow = true;
+    private long maxActive = 10;
+    private long maxIdle = 0;
+    private long maxWait = TimeUnit.SECONDS.toMillis(30);
 
 	public AGRepositoryConfig() {
 		super(AGRepositoryFactory.REPOSITORY_TYPE);
@@ -86,6 +97,62 @@ public class AGRepositoryConfig extends RepositoryImplConfigBase {
 		this.repositoryId = repositoryId;
 	}
 	
+	public Session getSession() {
+		return session;
+	}
+
+	public void setSession(Session session) {
+		this.session = session;
+	}
+
+	public long getSessionLifetime() {
+		return sessionLifetime;
+	}
+
+	public void setSessionLifetime(long sessionLifetime) {
+		this.sessionLifetime = sessionLifetime;
+	}
+
+	public boolean isShutdownHook() {
+		return shutdownHook;
+	}
+
+	public void setShutdownHook(boolean shutdownHook) {
+		this.shutdownHook = shutdownHook;
+	}
+
+	public boolean isTestOnBorrow() {
+		return testOnBorrow;
+	}
+
+	public void setTestOnBorrow(boolean testOnBorrow) {
+		this.testOnBorrow = testOnBorrow;
+	}
+
+	public long getMaxActive() {
+		return maxActive;
+	}
+
+	public void setMaxActive(long maxActive) {
+		this.maxActive = maxActive;
+	}
+
+	public long getMaxIdle() {
+		return maxIdle;
+	}
+
+	public void setMaxIdle(long maxIdle) {
+		this.maxIdle = maxIdle;
+	}
+
+	public long getMaxWait() {
+		return maxWait;
+	}
+
+	public void setMaxWait(long maxWait) {
+		this.maxWait = maxWait;
+	}
+
 	@Override
 	public void validate()
 		throws RepositoryConfigException
@@ -127,6 +194,15 @@ public class AGRepositoryConfig extends RepositoryImplConfigBase {
 		if (repositoryId != null) {
 			graph.add(implNode, REPOSITORYID, getValueFactory().createLiteral(repositoryId));
 		}
+		if (maxIdle > 0) {
+			graph.add(implNode, SESSION_TYPE, getValueFactory().createLiteral(session.name()));
+			graph.add(implNode, SESSION_LIFETIME, getValueFactory().createLiteral(sessionLifetime));
+			graph.add(implNode, SHUTDOWN_HOOK, getValueFactory().createLiteral(shutdownHook));
+			graph.add(implNode, TEST_ON_BORROW, getValueFactory().createLiteral(testOnBorrow));
+			graph.add(implNode, POOL_MAX_ACTIVE_CONNECTIONS, getValueFactory().createLiteral(maxActive));
+			graph.add(implNode, POOL_MAX_IDLE_CONNECTIONS, getValueFactory().createLiteral(maxIdle));
+			graph.add(implNode, POOL_MAX_TIME_TO_WAIT_FOR_CONNECTION, getValueFactory().createLiteral(maxWait));
+		}
 
 		return implNode;
 	}
@@ -157,6 +233,34 @@ public class AGRepositoryConfig extends RepositoryImplConfigBase {
 			Literal repositoryId = GraphUtil.getOptionalObjectLiteral(graph, implNode, REPOSITORYID);
 			if (repositoryId != null) {
 				setRepositoryId(repositoryId.getLabel());
+			}
+			Literal session = GraphUtil.getOptionalObjectLiteral(graph, implNode, SESSION_TYPE);
+			if (session != null) {
+				setSession(Session.valueOf(session.getLabel()));
+			}
+			Literal sessionLifetime = GraphUtil.getOptionalObjectLiteral(graph, implNode, SESSION_LIFETIME);
+			if (sessionLifetime != null) {
+				setSessionLifetime(sessionLifetime.longValue());
+			}
+			Literal shutdownHook = GraphUtil.getOptionalObjectLiteral(graph, implNode, SHUTDOWN_HOOK);
+			if (shutdownHook != null) {
+				setShutdownHook(shutdownHook.booleanValue());
+			}
+			Literal testOnBorrow = GraphUtil.getOptionalObjectLiteral(graph, implNode, TEST_ON_BORROW);
+			if (testOnBorrow != null) {
+				setTestOnBorrow(testOnBorrow.booleanValue());
+			}
+			Literal maxActive = GraphUtil.getOptionalObjectLiteral(graph, implNode, POOL_MAX_ACTIVE_CONNECTIONS);
+			if (maxActive != null) {
+				setMaxActive(maxActive.longValue());
+			}
+			Literal maxIdle = GraphUtil.getOptionalObjectLiteral(graph, implNode, POOL_MAX_IDLE_CONNECTIONS);
+			if (maxIdle != null) {
+				setMaxIdle(maxIdle.longValue());
+			}
+			Literal maxWait = GraphUtil.getOptionalObjectLiteral(graph, implNode, POOL_MAX_TIME_TO_WAIT_FOR_CONNECTION);
+			if (maxWait != null) {
+				setMaxWait(maxWait.longValue());
 			}
 		}
 		catch (GraphUtilException e) {
